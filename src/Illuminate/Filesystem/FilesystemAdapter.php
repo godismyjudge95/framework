@@ -24,6 +24,7 @@ use League\Flysystem\UnableToCreateDirectory;
 use League\Flysystem\UnableToDeleteDirectory;
 use League\Flysystem\UnableToDeleteFile;
 use League\Flysystem\UnableToMoveFile;
+use League\Flysystem\UnableToProvideChecksum;
 use League\Flysystem\UnableToReadFile;
 use League\Flysystem\UnableToRetrieveMetadata;
 use League\Flysystem\UnableToSetVisibility;
@@ -92,10 +93,13 @@ class FilesystemAdapter implements CloudFilesystemContract
         $this->driver = $driver;
         $this->adapter = $adapter;
         $this->config = $config;
+        $separator = $config['directory_separator'] ?? DIRECTORY_SEPARATOR;
 
-        $this->prefixer = new PathPrefixer(
-            $config['root'] ?? '', $config['directory_separator'] ?? DIRECTORY_SEPARATOR
-        );
+        $this->prefixer = new PathPrefixer($config['root'] ?? '', $separator);
+
+        if (isset($config['prefix'])) {
+            $this->prefixer = new PathPrefixer($this->prefixer->prefixPath($config['prefix']), $separator);
+        }
     }
 
     /**
@@ -259,6 +263,20 @@ class FilesystemAdapter implements CloudFilesystemContract
     }
 
     /**
+     * Get the contents of a file as decoded JSON.
+     *
+     * @param  string  $path
+     * @param  int  $flags
+     * @return array|null
+     */
+    public function json($path, $flags = 0)
+    {
+        $content = $this->get($path);
+
+        return is_null($content) ? null : json_decode($content, true, 512, $flags);
+    }
+
+    /**
      * Create a streamed response for a given file.
      *
      * @param  string  $path
@@ -367,13 +385,17 @@ class FilesystemAdapter implements CloudFilesystemContract
     /**
      * Store the uploaded file on the disk.
      *
-     * @param  string  $path
-     * @param  \Illuminate\Http\File|\Illuminate\Http\UploadedFile|string  $file
+     * @param  \Illuminate\Http\File|\Illuminate\Http\UploadedFile|string  $path
+     * @param  \Illuminate\Http\File|\Illuminate\Http\UploadedFile|string|array|null  $file
      * @param  mixed  $options
      * @return string|false
      */
-    public function putFile($path, $file, $options = [])
+    public function putFile($path, $file = null, $options = [])
     {
+        if (is_null($file) || is_array($file)) {
+            [$path, $file, $options] = ['', $path, $file ?? []];
+        }
+
         $file = is_string($file) ? new File($file) : $file;
 
         return $this->putFileAs($path, $file, $file->hashName(), $options);
@@ -382,14 +404,18 @@ class FilesystemAdapter implements CloudFilesystemContract
     /**
      * Store the uploaded file on the disk with a given name.
      *
-     * @param  string  $path
-     * @param  \Illuminate\Http\File|\Illuminate\Http\UploadedFile|string  $file
-     * @param  string  $name
+     * @param  \Illuminate\Http\File|\Illuminate\Http\UploadedFile|string  $path
+     * @param  \Illuminate\Http\File|\Illuminate\Http\UploadedFile|string|array|null  $file
+     * @param  string|array|null  $name
      * @param  mixed  $options
      * @return string|false
      */
-    public function putFileAs($path, $file, $name, $options = [])
+    public function putFileAs($path, $file, $name = null, $options = [])
     {
+        if (is_null($name) || is_array($name)) {
+            [$path, $file, $name, $options] = ['', $path, $file, $name ?? []];
+        }
+
         $stream = fopen(is_string($file) ? $file : $file->getRealPath(), 'r');
 
         // Next, we will format the path of the file and store the file using a stream since
@@ -552,6 +578,24 @@ class FilesystemAdapter implements CloudFilesystemContract
     }
 
     /**
+     * Get the checksum for a file.
+     *
+     * @return string|false
+     *
+     * @throws UnableToProvideChecksum
+     */
+    public function checksum(string $path, array $options = [])
+    {
+        try {
+            return $this->driver->checksum($path, $options);
+        } catch (UnableToProvideChecksum $e) {
+            throw_if($this->throwsExceptions(), $e);
+
+            return false;
+        }
+    }
+
+    /**
      * Get the mime-type of a given file.
      *
      * @param  string  $path
@@ -617,6 +661,10 @@ class FilesystemAdapter implements CloudFilesystemContract
      */
     public function url($path)
     {
+        if (isset($this->config['prefix'])) {
+            $path = $this->concatPathToUrl($this->config['prefix'], $path);
+        }
+
         $adapter = $this->adapter;
 
         if (method_exists($adapter, 'getUrl')) {
@@ -705,6 +753,25 @@ class FilesystemAdapter implements CloudFilesystemContract
         }
 
         throw new RuntimeException('This driver does not support creating temporary URLs.');
+    }
+
+    /**
+     * Get a temporary upload URL for the file at the given path.
+     *
+     * @param  string  $path
+     * @param  \DateTimeInterface  $expiration
+     * @param  array  $options
+     * @return array
+     *
+     * @throws \RuntimeException
+     */
+    public function temporaryUploadUrl($path, $expiration, array $options = [])
+    {
+        if (method_exists($this->adapter, 'temporaryUploadUrl')) {
+            return $this->adapter->temporaryUploadUrl($path, $expiration, $options);
+        }
+
+        throw new RuntimeException('This driver does not support creating temporary upload URLs.');
     }
 
     /**
@@ -916,7 +983,7 @@ class FilesystemAdapter implements CloudFilesystemContract
      *
      * @throws \BadMethodCallException
      */
-    public function __call($method, array $parameters)
+    public function __call($method, $parameters)
     {
         if (static::hasMacro($method)) {
             return $this->macroCall($method, $parameters);

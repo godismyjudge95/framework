@@ -499,6 +499,33 @@ class FoundationApplicationTest extends TestCase
             $_SERVER['APP_EVENTS_CACHE']
         );
     }
+
+    /** @test */
+    public function testMacroable(): void
+    {
+        $app = new Application;
+        $app['env'] = 'foo';
+
+        $app->macro('foo', function () {
+            return $this->environment('foo');
+        });
+
+        $this->assertTrue($app->foo());
+
+        $app['env'] = 'bar';
+
+        $this->assertFalse($app->foo());
+    }
+
+    /** @test */
+    public function testUseConfigPath(): void
+    {
+        $app = new Application;
+        $app->useConfigPath(__DIR__.'/fixtures/config');
+        $app->bootstrapWith([\Illuminate\Foundation\Bootstrap\LoadConfiguration::class]);
+
+        $this->assertSame('bar', $app->make('config')->get('app.foo'));
+    }
 }
 
 class ApplicationBasicServiceProviderStub extends ServiceProvider

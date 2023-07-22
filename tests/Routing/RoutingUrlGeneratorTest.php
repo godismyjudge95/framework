@@ -41,10 +41,10 @@ class RoutingUrlGeneratorTest extends TestCase
         );
 
         $this->assertSame('https://www.foo.com/foo/bar', $url->to('foo/bar'));
+    }
 
-        /*
-         * Test asset URL generation...
-         */
+    public function testAssetGeneration()
+    {
         $url = new UrlGenerator(
             new RouteCollection,
             Request::create('http://www.foo.com/index.php/')
@@ -52,6 +52,15 @@ class RoutingUrlGeneratorTest extends TestCase
 
         $this->assertSame('http://www.foo.com/foo/bar', $url->asset('foo/bar'));
         $this->assertSame('https://www.foo.com/foo/bar', $url->asset('foo/bar', true));
+
+        $url = new UrlGenerator(
+            new RouteCollection,
+            Request::create('http://www.foo.com/index.php/'),
+            '/'
+        );
+
+        $this->assertSame('/foo/bar', $url->asset('foo/bar'));
+        $this->assertSame('/foo/bar', $url->asset('foo/bar', true));
     }
 
     public function testBasicGenerationWithHostFormatting()
@@ -571,7 +580,7 @@ class RoutingUrlGeneratorTest extends TestCase
         $this->assertSame('http://sub.foo.com/foo/bar', $url->route('foo'));
     }
 
-    public function providerRouteParameters()
+    public static function providerRouteParameters()
     {
         return [
             [['test' => 123]],
@@ -600,7 +609,7 @@ class RoutingUrlGeneratorTest extends TestCase
         $this->assertSame('http://www.foo.com:8080/foo?test=123', $url->route('foo', $parameters));
     }
 
-    public function provideParametersAndExpectedMeaningfulExceptionMessages()
+    public static function provideParametersAndExpectedMeaningfulExceptionMessages()
     {
         return [
             'Missing parameters "one", "two" and "three"' => [
@@ -852,9 +861,6 @@ class RoutingUrlGeneratorTest extends TestCase
         Request::create($url->signedRoute('foo', ['expires' => 253402300799]));
     }
 
-    /**
-     * @requires PHP >= 8.1
-     */
     public function testRouteGenerationWithBackedEnums()
     {
         $url = new UrlGenerator(
@@ -866,6 +872,41 @@ class RoutingUrlGeneratorTest extends TestCase
         $routes->add($namedRoute);
 
         $this->assertSame('http://www.foo.com/foo/fruits', $url->route('foo.bar', CategoryBackedEnum::Fruits));
+    }
+
+    public function testSignedUrlWithKeyResolver()
+    {
+        $url = new UrlGenerator(
+            $routes = new RouteCollection,
+            $request = Request::create('http://www.foo.com/')
+        );
+        $url->setKeyResolver(function () {
+            return 'secret';
+        });
+
+        $route = new Route(['GET'], 'foo', ['as' => 'foo', function () {
+            //
+        }]);
+        $routes->add($route);
+
+        $request = Request::create($url->signedRoute('foo'));
+
+        $this->assertTrue($url->hasValidSignature($request));
+
+        $request = Request::create($url->signedRoute('foo').'?tempered=true');
+
+        $this->assertFalse($url->hasValidSignature($request));
+
+        $url2 = $url->withKeyResolver(function () {
+            return 'other-secret';
+        });
+
+        $this->assertFalse($url2->hasValidSignature($request));
+
+        $request = Request::create($url2->signedRoute('foo'));
+
+        $this->assertTrue($url2->hasValidSignature($request));
+        $this->assertFalse($url->hasValidSignature($request));
     }
 }
 

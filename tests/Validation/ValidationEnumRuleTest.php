@@ -7,21 +7,15 @@ use Illuminate\Support\Facades\Facade;
 use Illuminate\Translation\ArrayLoader;
 use Illuminate\Translation\Translator;
 use Illuminate\Validation\Rules\Enum;
-use Illuminate\Validation\Rules\Password;
 use Illuminate\Validation\ValidationServiceProvider;
 use Illuminate\Validation\Validator;
 use PHPUnit\Framework\TestCase;
 
-if (PHP_VERSION_ID >= 80100) {
-    include 'Enums.php';
-}
+include 'Enums.php';
 
-/**
- * @requires PHP >= 8.1
- */
 class ValidationEnumRuleTest extends TestCase
 {
-    public function testvalidationPassesWhenPassingCorrectEnum()
+    public function testValidationPassesWhenPassingCorrectEnum()
     {
         $v = new Validator(
             resolve('translator'),
@@ -38,7 +32,7 @@ class ValidationEnumRuleTest extends TestCase
         $this->assertFalse($v->fails());
     }
 
-    public function testvalidationPassesWhenPassingInstanceOfEnum()
+    public function testValidationPassesWhenPassingInstanceOfEnum()
     {
         $v = new Validator(
             resolve('translator'),
@@ -47,6 +41,21 @@ class ValidationEnumRuleTest extends TestCase
             ],
             [
                 'status' => new Enum(StringStatus::class),
+            ]
+        );
+
+        $this->assertFalse($v->fails());
+    }
+
+    public function testValidationPassesWhenPassingInstanceOfPureEnum()
+    {
+        $v = new Validator(
+            resolve('translator'),
+            [
+                'status' => PureEnum::one,
+            ],
+            [
+                'status' => new Enum(PureEnum::class),
             ]
         );
 
@@ -184,7 +193,5 @@ class ValidationEnumRuleTest extends TestCase
         Facade::clearResolvedInstances();
 
         Facade::setFacadeApplication(null);
-
-        Password::$defaultCallback = null;
     }
 }

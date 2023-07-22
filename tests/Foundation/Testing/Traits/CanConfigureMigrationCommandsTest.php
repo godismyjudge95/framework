@@ -12,7 +12,7 @@ class CanConfigureMigrationCommandsTest extends TestCase
 
     protected function setUp(): void
     {
-        $this->traitObject = $this->getObjectForTrait(CanConfigureMigrationCommands::class);
+        $this->traitObject = $this->getMockForAbstractClass(CanConfigureMigrationCommandsTestMockClass::class);
     }
 
     private function __reflectAndSetupAccessibleForProtectedTraitMethod($methodName)
@@ -21,8 +21,6 @@ class CanConfigureMigrationCommandsTest extends TestCase
             get_class($this->traitObject),
             $methodName
         );
-
-        $migrateFreshUsingReflection->setAccessible(true);
 
         return $migrateFreshUsingReflection;
     }
@@ -76,4 +74,13 @@ class CanConfigureMigrationCommandsTest extends TestCase
 
         $this->assertEquals($expected, $migrateFreshUsingReflection->invoke($this->traitObject));
     }
+}
+
+class CanConfigureMigrationCommandsTestMockClass
+{
+    use CanConfigureMigrationCommands;
+
+    public $dropViews = false;
+
+    public $dropTypes = false;
 }

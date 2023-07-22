@@ -471,6 +471,16 @@ class SupportArrTest extends TestCase
         $this->assertTrue(Arr::isAssoc([1 => 'a', 2 => 'b']));
         $this->assertFalse(Arr::isAssoc([0 => 'a', 1 => 'b']));
         $this->assertFalse(Arr::isAssoc(['a', 'b']));
+
+        $this->assertFalse(Arr::isAssoc([]));
+        $this->assertFalse(Arr::isAssoc([1, 2, 3]));
+        $this->assertFalse(Arr::isAssoc(['foo', 2, 3]));
+        $this->assertFalse(Arr::isAssoc([0 => 'foo', 'bar']));
+
+        $this->assertTrue(Arr::isAssoc([1 => 'foo', 'bar']));
+        $this->assertTrue(Arr::isAssoc([0 => 'foo', 'bar' => 'baz']));
+        $this->assertTrue(Arr::isAssoc([0 => 'foo', 2 => 'bar']));
+        $this->assertTrue(Arr::isAssoc(['foo' => 'bar', 'baz' => 'qux']));
     }
 
     public function testIsList()
@@ -639,6 +649,24 @@ class SupportArrTest extends TestCase
         $this->assertEquals(['first' => 'taylor', 'last' => 'otwell'], $data);
     }
 
+    public function testMapWithKeys()
+    {
+        $data = [
+            ['name' => 'Blastoise', 'type' => 'Water', 'idx' => 9],
+            ['name' => 'Charmander', 'type' => 'Fire', 'idx' => 4],
+            ['name' => 'Dragonair', 'type' => 'Dragon', 'idx' => 148],
+        ];
+
+        $data = Arr::mapWithKeys($data, function ($pokemon) {
+            return [$pokemon['name'] => $pokemon['type']];
+        });
+
+        $this->assertEquals(
+            ['Blastoise' => 'Water', 'Charmander' => 'Fire', 'Dragonair' => 'Dragon'],
+            $data
+        );
+    }
+
     public function testMapByReference()
     {
         $data = ['first' => 'taylor', 'last' => 'otwell'];
@@ -738,6 +766,12 @@ class SupportArrTest extends TestCase
         $this->assertCount(2, array_intersect_assoc(['one' => 'foo', 'two' => 'bar', 'three' => 'baz'], $random));
     }
 
+    public function testRandomNotIncrementingKeys()
+    {
+        $random = Arr::random(['foo' => 'foo', 'bar' => 'bar', 'baz' => 'baz']);
+        $this->assertContains($random, ['foo', 'bar', 'baz']);
+    }
+
     public function testRandomOnEmptyArray()
     {
         $random = Arr::random([], 0);
@@ -755,19 +789,19 @@ class SupportArrTest extends TestCase
 
         try {
             Arr::random([]);
-        } catch (InvalidArgumentException $e) {
+        } catch (InvalidArgumentException) {
             $exceptions++;
         }
 
         try {
             Arr::random([], 1);
-        } catch (InvalidArgumentException $e) {
+        } catch (InvalidArgumentException) {
             $exceptions++;
         }
 
         try {
             Arr::random([], 2);
-        } catch (InvalidArgumentException $e) {
+        } catch (InvalidArgumentException) {
             $exceptions++;
         }
 
@@ -824,6 +858,11 @@ class SupportArrTest extends TestCase
         );
     }
 
+    public function testEmptyShuffle()
+    {
+        $this->assertEquals([], Arr::shuffle([]));
+    }
+
     public function testSort()
     {
         $unsorted = [
@@ -847,6 +886,32 @@ class SupportArrTest extends TestCase
 
         // sort with dot notation
         $sortedWithDotNotation = array_values(Arr::sort($unsorted, 'name'));
+        $this->assertEquals($expected, $sortedWithDotNotation);
+    }
+
+    public function testSortDesc()
+    {
+        $unsorted = [
+            ['name' => 'Chair'],
+            ['name' => 'Desk'],
+        ];
+
+        $expected = [
+            ['name' => 'Desk'],
+            ['name' => 'Chair'],
+        ];
+
+        $sorted = array_values(Arr::sortDesc($unsorted));
+        $this->assertEquals($expected, $sorted);
+
+        // sort with closure
+        $sortedWithClosure = array_values(Arr::sortDesc($unsorted, function ($value) {
+            return $value['name'];
+        }));
+        $this->assertEquals($expected, $sortedWithClosure);
+
+        // sort with dot notation
+        $sortedWithDotNotation = array_values(Arr::sortDesc($unsorted, 'name'));
         $this->assertEquals($expected, $sortedWithDotNotation);
     }
 
@@ -927,6 +992,25 @@ class SupportArrTest extends TestCase
         $this->assertSame('font-bold mt-4 ml-2', $classes);
     }
 
+    public function testToCssStyles()
+    {
+        $styles = Arr::toCssStyles([
+            'font-weight: bold',
+            'margin-top: 4px;',
+        ]);
+
+        $this->assertSame('font-weight: bold; margin-top: 4px;', $styles);
+
+        $styles = Arr::toCssStyles([
+            'font-weight: bold;',
+            'margin-top: 4px',
+            'margin-left: 2px;' => true,
+            'margin-right: 2px' => false,
+        ]);
+
+        $this->assertSame('font-weight: bold; margin-top: 4px; margin-left: 2px;', $styles);
+    }
+
     public function testWhere()
     {
         $array = [100, '200', 300, '400', 500];
@@ -1001,9 +1085,9 @@ class SupportArrTest extends TestCase
         Arr::forget($array, 1);
         $this->assertEquals(['name' => 'hAz', 2 => 'bAz'], $array);
 
-        $array = [2 => [1 =>'products', 3 => 'users']];
+        $array = [2 => [1 => 'products', 3 => 'users']];
         Arr::forget($array, 2.3);
-        $this->assertEquals([2 => [1 =>'products']], $array);
+        $this->assertEquals([2 => [1 => 'products']], $array);
     }
 
     public function testWrap()

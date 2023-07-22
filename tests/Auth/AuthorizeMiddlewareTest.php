@@ -11,6 +11,8 @@ use Illuminate\Contracts\Routing\Registrar;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Events\Dispatcher;
 use Illuminate\Http\Request;
+use Illuminate\Routing\CallableDispatcher;
+use Illuminate\Routing\Contracts\CallableDispatcher as CallableDispatcherContract;
 use Illuminate\Routing\Middleware\SubstituteBindings;
 use Illuminate\Routing\Router;
 use Mockery as m;
@@ -39,6 +41,8 @@ class AuthorizeMiddlewareTest extends TestCase
 
         $this->router = new Router(new Dispatcher, $this->container);
 
+        $this->container->bind(CallableDispatcherContract::class, fn ($app) => new CallableDispatcher($app));
+
         $this->container->singleton(Registrar::class, function () {
             return $this->router;
         });
@@ -49,6 +53,18 @@ class AuthorizeMiddlewareTest extends TestCase
         m::close();
 
         Container::setInstance(null);
+    }
+
+    public function testItCanGenerateDefinitionViaStaticMethod()
+    {
+        $signature = (string) Authorize::using('ability');
+        $this->assertSame('Illuminate\Auth\Middleware\Authorize:ability', $signature);
+
+        $signature = (string) Authorize::using('ability', 'model');
+        $this->assertSame('Illuminate\Auth\Middleware\Authorize:ability,model', $signature);
+
+        $signature = (string) Authorize::using('ability', 'model', \App\Models\Comment::class);
+        $this->assertSame('Illuminate\Auth\Middleware\Authorize:ability,model,App\Models\Comment', $signature);
     }
 
     public function testSimpleAbilityUnauthorized()

@@ -17,6 +17,17 @@ test
         $this->assertEquals($expected, $this->compiler->compileString($string));
     }
 
+    public function testPushIsCompiledWithParenthesis()
+    {
+        $string = '@push(\'foo):))\')
+test
+@endpush';
+        $expected = '<?php $__env->startPush(\'foo):))\'); ?>
+test
+<?php $__env->stopPush(); ?>';
+        $this->assertEquals($expected, $this->compiler->compileString($string));
+    }
+
     public function testPushOnceIsCompiled()
     {
         $string = '@pushOnce(\'foo\', \'bar\')
@@ -41,6 +52,18 @@ test
 
         $expected = '<?php if (! $__env->hasRenderedOnce(\'e60e8f77-9ac3-4f71-9f8e-a044ef481d7f\')): $__env->markAsRenderedOnce(\'e60e8f77-9ac3-4f71-9f8e-a044ef481d7f\');
 $__env->startPush(\'foo\'); ?>
+test
+<?php $__env->stopPush(); endif; ?>';
+
+        $this->assertEquals($expected, $this->compiler->compileString($string));
+    }
+
+    public function testPushIfIsCompiled()
+    {
+        $string = '@pushIf(true, \'foo\')
+test
+@endPushIf';
+        $expected = '<?php if(true): $__env->startPush( \'foo\'); ?>
 test
 <?php $__env->stopPush(); endif; ?>';
 

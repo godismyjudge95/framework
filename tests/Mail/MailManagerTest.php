@@ -4,6 +4,7 @@ namespace Illuminate\Tests\Mail;
 
 use InvalidArgumentException;
 use Orchestra\Testbench\TestCase;
+use Symfony\Component\Mailer\Transport\Smtp\EsmtpTransport;
 
 class MailManagerTest extends TestCase
 {
@@ -27,7 +28,23 @@ class MailManagerTest extends TestCase
         $this->app['mail.manager']->mailer('custom_smtp');
     }
 
-    public function emptyTransportConfigDataProvider()
+    public function testMailUrlConfig()
+    {
+        $this->app['config']->set('mail.mailers.smtp_url', [
+            'url' => 'smtp://usr:pwd@127.0.0.2:5876',
+        ]);
+
+        $mailer = $this->app['mail.manager']->mailer('smtp_url');
+        $transport = $mailer->getSymfonyTransport();
+
+        $this->assertInstanceOf(EsmtpTransport::class, $transport);
+        $this->assertSame('usr', $transport->getUsername());
+        $this->assertSame('pwd', $transport->getPassword());
+        $this->assertSame('127.0.0.2', $transport->getStream()->getHost());
+        $this->assertSame(5876, $transport->getStream()->getPort());
+    }
+
+    public static function emptyTransportConfigDataProvider()
     {
         return [
             [null], [''], [' '],

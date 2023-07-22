@@ -412,7 +412,7 @@ class SessionStoreTest extends TestCase
         $this->assertFalse($session->handlerNeedsRequest());
         $session->getHandler()->shouldReceive('setRequest')->never();
 
-        $session = new Store('test', m::mock(new CookieSessionHandler(new CookieJar, 60)));
+        $session = new Store('test', m::mock(new CookieSessionHandler(new CookieJar, 60, false)));
         $this->assertTrue($session->handlerNeedsRequest());
         $session->getHandler()->shouldReceive('setRequest')->once();
         $request = new Request;
@@ -439,6 +439,41 @@ class SessionStoreTest extends TestCase
         $this->assertEquals($session->getName(), $this->getSessionName());
         $session->setName('foo');
         $this->assertSame('foo', $session->getName());
+    }
+
+    public function testForget()
+    {
+        $session = $this->getSession();
+        $session->put('foo', 'bar');
+        $this->assertTrue($session->has('foo'));
+        $session->forget('foo');
+        $this->assertFalse($session->has('foo'));
+
+        $session->put('foo', 'bar');
+        $session->put('bar', 'baz');
+        $session->forget(['foo', 'bar']);
+        $this->assertFalse($session->has('foo'));
+        $this->assertFalse($session->has('bar'));
+    }
+
+    public function testSetPreviousUrl()
+    {
+        $session = $this->getSession();
+        $session->setPreviousUrl('https://example.com/foo/bar');
+
+        $this->assertTrue($session->has('_previous.url'));
+        $this->assertSame('https://example.com/foo/bar', $session->get('_previous.url'));
+
+        $url = $session->previousUrl();
+        $this->assertSame('https://example.com/foo/bar', $url);
+    }
+
+    public function testPasswordConfirmed()
+    {
+        $session = $this->getSession();
+        $this->assertFalse($session->has('auth.password_confirmed_at'));
+        $session->passwordConfirmed();
+        $this->assertTrue($session->has('auth.password_confirmed_at'));
     }
 
     public function testKeyPush()
@@ -597,6 +632,15 @@ class SessionStoreTest extends TestCase
             'Your first name is required',
             'Your first name must be at least 1 character',
         ]], $errors->getBags()['default']->getMessages());
+    }
+
+    public function testItIsMacroable()
+    {
+        $this->getSession()->macro('foo', function () {
+            return 'macroable';
+        });
+
+        $this->assertSame('macroable', $this->getSession()->foo());
     }
 
     public function getSession($serialization = 'php')

@@ -45,7 +45,7 @@ class DatabaseConnectorTest extends TestCase
         $this->assertSame($result, $connection);
     }
 
-    public function mySqlConnectProvider()
+    public static function mySqlConnectProvider()
     {
         return [
             ['mysql:host=foo;dbname=bar', ['host' => 'foo', 'database' => 'bar', 'collation' => 'utf8_unicode_ci', 'charset' => 'utf8']],
@@ -112,7 +112,7 @@ class DatabaseConnectorTest extends TestCase
         $this->assertSame($result, $connection);
     }
 
-    public function provideSearchPaths()
+    public static function provideSearchPaths()
     {
         return [
             'all-lowercase' => [
@@ -220,6 +220,22 @@ class DatabaseConnectorTest extends TestCase
     {
         $dsn = 'pgsql:dbname=\'baz\'';
         $config = ['database' => 'bar', 'connect_via_database' => 'baz'];
+        $connector = $this->getMockBuilder(PostgresConnector::class)->onlyMethods(['createConnection', 'getOptions'])->getMock();
+        $connection = m::mock(stdClass::class);
+        $connector->expects($this->once())->method('getOptions')->with($this->equalTo($config))->willReturn(['options']);
+        $connector->expects($this->once())->method('createConnection')->with($this->equalTo($dsn), $this->equalTo($config), $this->equalTo(['options']))->willReturn($connection);
+        $statement = m::mock(PDOStatement::class);
+        $connection->shouldReceive('prepare')->zeroOrMoreTimes()->andReturn($statement);
+        $statement->shouldReceive('execute')->zeroOrMoreTimes();
+        $result = $connector->connect($config);
+
+        $this->assertSame($result, $connection);
+    }
+
+    public function testPostgresApplicationUseAlternativeDatabaseNameAndPort()
+    {
+        $dsn = 'pgsql:dbname=\'baz\';port=2345';
+        $config = ['database' => 'bar', 'connect_via_database' => 'baz', 'port' => 5432, 'connect_via_port' => 2345];
         $connector = $this->getMockBuilder(PostgresConnector::class)->onlyMethods(['createConnection', 'getOptions'])->getMock();
         $connection = m::mock(stdClass::class);
         $connector->expects($this->once())->method('getOptions')->with($this->equalTo($config))->willReturn(['options']);

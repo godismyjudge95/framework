@@ -1,10 +1,15 @@
 name: databases
 
-on: [push, pull_request]
+on:
+  push:
+    branches:
+      - master
+      - '*.x'
+  pull_request:
 
 jobs:
   mysql_57:
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-22.04
 
     services:
       mysql:
@@ -23,7 +28,7 @@ jobs:
 
     steps:
       - name: Checkout code
-        uses: actions/checkout@v2
+        uses: actions/checkout@v3
 
       - name: Setup PHP
         uses: shivammathur/setup-php@v2
@@ -34,20 +39,20 @@ jobs:
           coverage: none
 
       - name: Install dependencies
-        uses: nick-invision/retry@v1
+        uses: nick-fields/retry@v2
         with:
           timeout_minutes: 5
           max_attempts: 5
           command: composer update --prefer-stable --prefer-dist --no-interaction --no-progress
 
       - name: Execute tests
-        run: vendor/bin/phpunit tests/Integration/Database --verbose
+        run: vendor/bin/phpunit tests/Integration/Database
         env:
           DB_CONNECTION: mysql
           DB_USERNAME: root
 
   mysql_8:
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-22.04
 
     services:
       mysql:
@@ -66,7 +71,7 @@ jobs:
 
     steps:
       - name: Checkout code
-        uses: actions/checkout@v2
+        uses: actions/checkout@v3
 
       - name: Setup PHP
         uses: shivammathur/setup-php@v2
@@ -77,20 +82,20 @@ jobs:
           coverage: none
 
       - name: Install dependencies
-        uses: nick-invision/retry@v1
+        uses: nick-fields/retry@v2
         with:
           timeout_minutes: 5
           max_attempts: 5
           command: composer update --prefer-stable --prefer-dist --no-interaction --no-progress
 
       - name: Execute tests
-        run: vendor/bin/phpunit tests/Integration/Database --verbose
+        run: vendor/bin/phpunit tests/Integration/Database
         env:
           DB_CONNECTION: mysql
           DB_USERNAME: root
 
   mariadb:
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-22.04
 
     services:
       mysql:
@@ -109,7 +114,7 @@ jobs:
 
     steps:
       - name: Checkout code
-        uses: actions/checkout@v2
+        uses: actions/checkout@v3
 
       - name: Setup PHP
         uses: shivammathur/setup-php@v2
@@ -120,20 +125,20 @@ jobs:
           coverage: none
 
       - name: Install dependencies
-        uses: nick-invision/retry@v1
+        uses: nick-fields/retry@v2
         with:
           timeout_minutes: 5
           max_attempts: 5
           command: composer update --prefer-stable --prefer-dist --no-interaction --no-progress
 
       - name: Execute tests
-        run: vendor/bin/phpunit tests/Integration/Database --verbose
+        run: vendor/bin/phpunit tests/Integration/Database
         env:
           DB_CONNECTION: mysql
           DB_USERNAME: root
 
   pgsql:
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-22.04
 
     services:
       postgresql:
@@ -153,7 +158,7 @@ jobs:
 
     steps:
       - name: Checkout code
-        uses: actions/checkout@v2
+        uses: actions/checkout@v3
 
       - name: Setup PHP
         uses: shivammathur/setup-php@v2
@@ -164,58 +169,58 @@ jobs:
           coverage: none
 
       - name: Install dependencies
-        uses: nick-invision/retry@v1
+        uses: nick-fields/retry@v2
         with:
           timeout_minutes: 5
           max_attempts: 5
           command: composer update --prefer-stable --prefer-dist --no-interaction --no-progress
 
       - name: Execute tests
-        run: vendor/bin/phpunit tests/Integration/Database --verbose
+        run: vendor/bin/phpunit tests/Integration/Database
         env:
           DB_CONNECTION: pgsql
           DB_PASSWORD: password
 
-  mssql:
-    runs-on: ubuntu-20.04
+  # mssql:
+  #   runs-on: ubuntu-20.04
 
-    services:
-      sqlsrv:
-        image: mcr.microsoft.com/mssql/server:2019-latest
-        env:
-          ACCEPT_EULA: Y
-          SA_PASSWORD: Forge123
-        ports:
-          - 1433:1433
+  #   services:
+  #     sqlsrv:
+  #       image: mcr.microsoft.com/mssql/server:2019-latest
+  #       env:
+  #         ACCEPT_EULA: Y
+  #         SA_PASSWORD: Forge123
+  #       ports:
+  #         - 1433:1433
 
-    strategy:
-      fail-fast: true
+  #   strategy:
+  #     fail-fast: true
 
-    name: SQL Server 2019
+  #   name: SQL Server 2019
 
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v2
+  #   steps:
+  #     - name: Checkout code
+  #       uses: actions/checkout@v3
 
-      - name: Setup PHP
-        uses: shivammathur/setup-php@v2
-        with:
-          php-version: 8.1
-          extensions: dom, curl, libxml, mbstring, zip, pcntl, sqlsrv, pdo, pdo_sqlsrv
-          tools: composer:v2
-          coverage: none
+  #     - name: Setup PHP
+  #       uses: shivammathur/setup-php@v2
+  #       with:
+  #         php-version: 8.1
+  #         extensions: dom, curl, libxml, mbstring, zip, pcntl, sqlsrv, pdo, pdo_sqlsrv, odbc, pdo_odbc
+  #         tools: composer:v2
+  #         coverage: none
 
-      - name: Install dependencies
-        uses: nick-invision/retry@v1
-        with:
-          timeout_minutes: 5
-          max_attempts: 5
-          command: composer update --prefer-stable --prefer-dist --no-interaction --no-progress
+  #     - name: Install dependencies
+  #       uses: nick-fields/retry@v2
+  #       with:
+  #         timeout_minutes: 5
+  #         max_attempts: 5
+  #         command: composer update --prefer-stable --prefer-dist --no-interaction --no-progress
 
-      - name: Execute tests
-        run: vendor/bin/phpunit tests/Integration/Database --verbose --exclude-group SkipMSSQL
-        env:
-          DB_CONNECTION: sqlsrv
-          DB_DATABASE: master
-          DB_USERNAME: SA
-          DB_PASSWORD: Forge123
+  #     - name: Execute tests
+  #       run: vendor/bin/phpunit tests/Integration/Database
+  #       env:
+  #         DB_CONNECTION: sqlsrv
+  #         DB_DATABASE: master
+  #         DB_USERNAME: SA
+  #         DB_PASSWORD: Forge123

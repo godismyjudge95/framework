@@ -17,7 +17,7 @@ class DatabaseMigrationsTest extends TestCase
     {
         RefreshDatabaseState::$migrated = false;
 
-        $this->traitObject = $this->getMockForTrait(DatabaseMigrations::class, [], '', true, true, true, [
+        $this->traitObject = $this->getMockForAbstractClass(DatabaseMigrationsTestMockClass::class, [], '', true, true, true, [
             'artisan',
             'beforeApplicationDestroyed',
         ]);
@@ -37,8 +37,6 @@ class DatabaseMigrationsTest extends TestCase
             get_class($this->traitObject),
             $methodName
         );
-
-        $migrateFreshUsingReflection->setAccessible(true);
 
         return $migrateFreshUsingReflection;
     }
@@ -94,4 +92,15 @@ class DatabaseMigrationsTest extends TestCase
 
         $refreshTestDatabaseReflection->invoke($this->traitObject);
     }
+}
+
+class DatabaseMigrationsTestMockClass
+{
+    use DatabaseMigrations;
+
+    public $app;
+
+    public $dropViews = false;
+
+    public $dropTypes = false;
 }

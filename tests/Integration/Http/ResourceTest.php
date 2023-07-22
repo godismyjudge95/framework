@@ -2,6 +2,7 @@
 
 namespace Illuminate\Tests\Integration\Http;
 
+use Illuminate\Database\Eloquent\Model;
 use Illuminate\Foundation\Http\Middleware\ValidatePostSize;
 use Illuminate\Http\Exceptions\PostTooLargeException;
 use Illuminate\Http\Request;
@@ -30,11 +31,14 @@ use Illuminate\Tests\Integration\Http\Fixtures\PostResourceWithJsonOptionsAndTyp
 use Illuminate\Tests\Integration\Http\Fixtures\PostResourceWithOptionalAppendedAttributes;
 use Illuminate\Tests\Integration\Http\Fixtures\PostResourceWithOptionalAttributes;
 use Illuminate\Tests\Integration\Http\Fixtures\PostResourceWithOptionalData;
+use Illuminate\Tests\Integration\Http\Fixtures\PostResourceWithOptionalHasAttributes;
 use Illuminate\Tests\Integration\Http\Fixtures\PostResourceWithOptionalMerging;
 use Illuminate\Tests\Integration\Http\Fixtures\PostResourceWithOptionalPivotRelationship;
 use Illuminate\Tests\Integration\Http\Fixtures\PostResourceWithOptionalRelationship;
+use Illuminate\Tests\Integration\Http\Fixtures\PostResourceWithOptionalRelationshipAggregates;
 use Illuminate\Tests\Integration\Http\Fixtures\PostResourceWithOptionalRelationshipCounts;
 use Illuminate\Tests\Integration\Http\Fixtures\PostResourceWithoutWrap;
+use Illuminate\Tests\Integration\Http\Fixtures\PostResourceWithUnlessOptionalData;
 use Illuminate\Tests\Integration\Http\Fixtures\ReallyEmptyPostResource;
 use Illuminate\Tests\Integration\Http\Fixtures\ResourceWithPreservedKeys;
 use Illuminate\Tests\Integration\Http\Fixtures\SerializablePostResource;
@@ -165,6 +169,31 @@ class ResourceTest extends TestCase
         ]);
     }
 
+    public function testResourcesMayHaveOptionalValuesUsingUnless()
+    {
+        Route::get('/', function () {
+            return new PostResourceWithUnlessOptionalData(new Post([
+                'id' => 5,
+            ]));
+        });
+
+        $response = $this->withoutExceptionHandling()->get(
+            '/',
+            ['Accept' => 'application/json']
+        );
+
+        $response->assertStatus(200);
+
+        $response->assertJson([
+            'data' => [
+                'id' => 5,
+                'first' => 'value',
+                'fourth' => 'value',
+                'fifth' => 'value',
+            ],
+        ]);
+    }
+
     public function testResourcesMayHaveOptionalSelectedAttributes()
     {
         Route::get('/', function () {
@@ -183,6 +212,60 @@ class ResourceTest extends TestCase
             'data' => [
                 'id' => 5,
                 'title' => 'no title',
+            ],
+        ]);
+    }
+
+    public function testResourcesMayHaveOptionalHasAttributes()
+    {
+        Route::get('/', function () {
+            $post = new Post([
+                'id' => 5,
+                'is_published' => true,
+            ]);
+
+            return new PostResourceWithOptionalHasAttributes($post);
+        });
+
+        $response = $this->withoutExceptionHandling()->get(
+            '/',
+            ['Accept' => 'application/json']
+        );
+
+        $response->assertStatus(200);
+
+        $response->assertJson([
+            'data' => [
+                'id' => 5,
+                'first' => true,
+                'second' => 'override value',
+                'third' => 'override value',
+                'fourth' => true,
+                'fifth' => true,
+            ],
+        ]);
+    }
+
+    public function testResourcesWithOptionalHasAttributesReturnDefaultValuesAndNotMissingValues()
+    {
+        Route::get('/', function () {
+            return new PostResourceWithOptionalHasAttributes(new Post([
+                'id' => 5,
+            ]));
+        });
+
+        $response = $this->withoutExceptionHandling()->get(
+            '/',
+            ['Accept' => 'application/json']
+        );
+
+        $response->assertStatus(200);
+
+        $response->assertExactJson([
+            'data' => [
+                'id' => 5,
+                'fourth' => 'default',
+                'fifth' => 'default',
             ],
         ]);
     }
@@ -367,6 +450,65 @@ class ResourceTest extends TestCase
         ]);
     }
 
+    public function testResourcesMayLoadOptionalRelationshipAggregates()
+    {
+        Route::get('/', function () {
+            $post = new Post([
+                'id' => 5,
+                'title' => 'Test Title',
+                'comments_avg_rating' => 3.8,
+                'comments_min_rating' => 2,
+                'comments_max_rating' => 5,
+            ]);
+
+            return new PostResourceWithOptionalRelationshipAggregates($post);
+        });
+
+        $response = $this->withoutExceptionHandling()->get(
+            '/', ['Accept' => 'application/json']
+        );
+
+        $response->assertStatus(200);
+
+        $response->assertExactJson([
+            'data' => [
+                'id' => 5,
+                'title' => 'Test Title',
+                'average_rating' => 3.8,
+                'minimum_rating' => 2,
+                'maximum_rating' => '5 ratings',
+            ],
+        ]);
+    }
+
+    public function testResourcesMayHaveOptionalRelationshipAggregates()
+    {
+        Route::get('/', function () {
+            $post = new Post([
+                'id' => 5,
+                'title' => 'Test Title',
+            ]);
+
+            return new PostResourceWithOptionalRelationshipAggregates($post);
+        });
+
+        $response = $this->withoutExceptionHandling()->get(
+            '/', ['Accept' => 'application/json']
+        );
+
+        $response->assertStatus(200);
+
+        $response->assertExactJson([
+            'data' => [
+                'id' => 5,
+                'title' => 'Test Title',
+                'average_rating' => null,
+                'minimum_rating' => null,
+                'maximum_rating' => 'Default Value',
+            ],
+        ]);
+    }
+
     public function testResourcesMayShowsNullForLoadedRelationshipWithValueNull()
     {
         Route::get('/', function () {
@@ -439,6 +581,33 @@ class ResourceTest extends TestCase
                 'subscription' => [
                     'foo' => 'bar',
                 ],
+            ],
+        ]);
+    }
+
+    public function testResourceDoesNotThrowErrorWhenUsingEloquentStrictModeAndCheckingOptionalPivotRelationship()
+    {
+        Model::shouldBeStrict(true);
+
+        Route::get('/', function () {
+            $post = new Post(['id' => 5]);
+            (function () {
+                $this->exists = true;
+                $this->wasRecentlyCreated = false;
+            })->bindTo($post)();
+
+            return new PostResourceWithOptionalPivotRelationship($post);
+        });
+
+        $response = $this->withoutExceptionHandling()->get(
+            '/', ['Accept' => 'application/json']
+        );
+
+        $response->assertStatus(200);
+
+        $response->assertExactJson([
+            'data' => [
+                'id' => 5,
             ],
         ]);
     }
@@ -1417,7 +1586,7 @@ class ResourceTest extends TestCase
                     'Mohamed',
                     $this->mergeWhen(false, ['Adam', 'Matt']),
                     'Jeffrey',
-                    $this->mergeWhen(false, (['Abigail', 'Lydia'])),
+                    $this->mergeWhen(false, ['Abigail', 'Lydia']),
                 ]);
             }
         };

@@ -5,6 +5,8 @@ namespace Illuminate\Foundation\Testing\Concerns;
 use Closure;
 use Illuminate\Foundation\Mix;
 use Illuminate\Foundation\Vite;
+use Illuminate\Support\Facades\Facade;
+use Illuminate\Support\HtmlString;
 use Mockery;
 
 trait InteractsWithContainer
@@ -109,6 +111,8 @@ trait InteractsWithContainer
             $this->originalVite = app(Vite::class);
         }
 
+        Facade::clearResolvedInstance(Vite::class);
+
         $this->swap(Vite::class, new class
         {
             public function __invoke()
@@ -121,7 +125,27 @@ trait InteractsWithContainer
                 return '';
             }
 
+            public function __toString()
+            {
+                return '';
+            }
+
             public function useIntegrityKey()
+            {
+                return $this;
+            }
+
+            public function useBuildDirectory()
+            {
+                return $this;
+            }
+
+            public function useHotFile()
+            {
+                return $this;
+            }
+
+            public function withEntryPoints()
             {
                 return $this;
             }
@@ -134,6 +158,11 @@ trait InteractsWithContainer
             public function useStyleTagAttributes()
             {
                 return $this;
+            }
+
+            public function preloadedAssets()
+            {
+                return [];
             }
         });
 
@@ -166,7 +195,7 @@ trait InteractsWithContainer
         }
 
         $this->swap(Mix::class, function () {
-            return '';
+            return new HtmlString('');
         });
 
         return $this;

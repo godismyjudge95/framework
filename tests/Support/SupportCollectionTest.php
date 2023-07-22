@@ -16,12 +16,14 @@ use Illuminate\Support\LazyCollection;
 use Illuminate\Support\MultipleItemsFoundException;
 use Illuminate\Support\Str;
 use InvalidArgumentException;
+use IteratorAggregate;
 use JsonSerializable;
 use Mockery as m;
 use PHPUnit\Framework\TestCase;
 use ReflectionClass;
 use stdClass;
 use Symfony\Component\VarDumper\VarDumper;
+use Traversable;
 use UnexpectedValueException;
 
 if (PHP_VERSION_ID >= 80100) {
@@ -604,7 +606,6 @@ class SupportCollectionTest extends TestCase
 
         $class = new ReflectionClass($collection);
         $method = $class->getMethod('getArrayableItems');
-        $method->setAccessible(true);
 
         $items = new TestArrayableObject;
         $array = $method->invokeArgs($data, [$items]);
@@ -621,6 +622,11 @@ class SupportCollectionTest extends TestCase
         $items = new TestJsonSerializeWithScalarValueObject;
         $array = $method->invokeArgs($data, [$items]);
         $this->assertSame(['foo'], $array);
+
+        $subject = [new stdClass, new stdClass];
+        $items = new TestTraversableAndJsonSerializableObject($subject);
+        $array = $method->invokeArgs($data, [$items]);
+        $this->assertSame($subject, $array);
 
         $items = new $collection(['foo' => 'bar']);
         $array = $method->invokeArgs($data, [$items]);
@@ -787,6 +793,21 @@ class SupportCollectionTest extends TestCase
 
         $c = new Collection(['name' => 'taylor', 'foo' => 'bar', 'baz' => 'qux']);
         $c = $c->forget(['foo', 'baz'])->all();
+        $this->assertFalse(isset($c['foo']));
+        $this->assertFalse(isset($c['baz']));
+        $this->assertTrue(isset($c['name']));
+    }
+
+    public function testForgetCollectionOfKeys()
+    {
+        $c = new Collection(['foo', 'bar', 'baz']);
+        $c = $c->forget(collect([0, 2]))->all();
+        $this->assertFalse(isset($c[0]));
+        $this->assertFalse(isset($c[2]));
+        $this->assertTrue(isset($c[1]));
+
+        $c = new Collection(['name' => 'taylor', 'foo' => 'bar', 'baz' => 'qux']);
+        $c = $c->forget(collect(['foo', 'baz']))->all();
         $this->assertFalse(isset($c['foo']));
         $this->assertFalse(isset($c['baz']));
         $this->assertTrue(isset($c['name']));
@@ -1696,6 +1717,68 @@ class SupportCollectionTest extends TestCase
     /**
      * @dataProvider collectionClassProvider
      */
+    public function testIntersectUsingWithNull($collection)
+    {
+        $collect = new $collection(['green', 'brown', 'blue']);
+
+        $this->assertEquals([], $collect->intersectUsing(null, 'strcasecmp')->all());
+    }
+
+    /**
+     * @dataProvider collectionClassProvider
+     */
+    public function testIntersectUsingCollection($collection)
+    {
+        $collect = new $collection(['green', 'brown', 'blue']);
+
+        $this->assertEquals(['green', 'brown'], $collect->intersectUsing(new $collection(['GREEN', 'brown', 'yellow']), 'strcasecmp')->all());
+    }
+
+    /**
+     * @dataProvider collectionClassProvider
+     */
+    public function testIntersectAssocWithNull($collection)
+    {
+        $array1 = new $collection(['a' => 'green', 'b' => 'brown', 'c' => 'blue', 'red']);
+
+        $this->assertEquals([], $array1->intersectAssoc(null)->all());
+    }
+
+    /**
+     * @dataProvider collectionClassProvider
+     */
+    public function testIntersectAssocCollection($collection)
+    {
+        $array1 = new $collection(['a' => 'green', 'b' => 'brown', 'c' => 'blue', 'red']);
+        $array2 = new $collection(['a' => 'green', 'b' => 'yellow', 'blue', 'red']);
+
+        $this->assertEquals(['a' => 'green'], $array1->intersectAssoc($array2)->all());
+    }
+
+    /**
+     * @dataProvider collectionClassProvider
+     */
+    public function testIntersectAssocUsingWithNull($collection)
+    {
+        $array1 = new $collection(['a' => 'green', 'b' => 'brown', 'c' => 'blue', 'red']);
+
+        $this->assertEquals([], $array1->intersectAssocUsing(null, 'strcasecmp')->all());
+    }
+
+    /**
+     * @dataProvider collectionClassProvider
+     */
+    public function testIntersectAssocUsingCollection($collection)
+    {
+        $array1 = new $collection(['a' => 'green', 'b' => 'brown', 'c' => 'blue', 'red']);
+        $array2 = new $collection(['a' => 'GREEN', 'B' => 'brown', 'yellow', 'red']);
+
+        $this->assertEquals(['b' => 'brown'], $array1->intersectAssocUsing($array2, 'strcasecmp')->all());
+    }
+
+    /**
+     * @dataProvider collectionClassProvider
+     */
     public function testIntersectByKeysNull($collection)
     {
         $c = new $collection(['name' => 'Mateus', 'age' => 18]);
@@ -2409,9 +2492,19 @@ class SupportCollectionTest extends TestCase
         $this->assertInstanceOf($collection, $random);
         $this->assertCount(2, $random);
 
+        $random = $data->random(2, true);
+        $this->assertInstanceOf($collection, $random);
+        $this->assertCount(2, $random);
+        $this->assertCount(2, array_intersect_assoc($random->all(), $data->all()));
+
         $random = $data->random(fn ($items) => min(10, count($items)));
         $this->assertInstanceOf($collection, $random);
         $this->assertCount(6, $random);
+
+        $random = $data->random(fn ($items) => min(10, count($items) - 1), true);
+        $this->assertInstanceOf($collection, $random);
+        $this->assertCount(5, $random);
+        $this->assertCount(5, array_intersect_assoc($random->all(), $data->all()));
     }
 
     /**
@@ -4613,7 +4706,6 @@ class SupportCollectionTest extends TestCase
 
     /**
      * @dataProvider collectionClassProvider
-     * @requires PHP >= 8.1
      */
     public function testCollectionFromEnum($collection)
     {
@@ -4623,7 +4715,6 @@ class SupportCollectionTest extends TestCase
 
     /**
      * @dataProvider collectionClassProvider
-     * @requires PHP >= 8.1
      */
     public function testCollectionFromBackedEnum($collection)
     {
@@ -5453,11 +5544,47 @@ class SupportCollectionTest extends TestCase
     }
 
     /**
+     * @dataProvider collectionClassProvider
+     */
+    public function testDot($collection)
+    {
+        $data = $collection::make([
+            'name' => 'Taylor',
+            'meta' => [
+                'foo' => 'bar',
+                'baz' => 'boom',
+                'bam' => [
+                    'boom' => 'bip',
+                ],
+            ],
+        ])->dot();
+        $this->assertSame([
+            'name' => 'Taylor',
+            'meta.foo' => 'bar',
+            'meta.baz' => 'boom',
+            'meta.bam.boom' => 'bip',
+        ], $data->all());
+
+        $data = $collection::make([
+            'foo' => [
+                'bar',
+                'baz',
+                'baz' => 'boom',
+            ],
+        ])->dot();
+        $this->assertSame([
+            'foo.0' => 'bar',
+            'foo.1' => 'baz',
+            'foo.baz' => 'boom',
+        ], $data->all());
+    }
+
+    /**
      * Provides each collection class, respectively.
      *
      * @return array
      */
-    public function collectionClassProvider()
+    public static function collectionClassProvider()
     {
         return [
             [Collection::class],
@@ -5589,6 +5716,26 @@ class TestJsonSerializeWithScalarValueObject implements JsonSerializable
     public function jsonSerialize(): string
     {
         return 'foo';
+    }
+}
+
+class TestTraversableAndJsonSerializableObject implements IteratorAggregate, JsonSerializable
+{
+    public $items;
+
+    public function __construct($items)
+    {
+        $this->items = $items;
+    }
+
+    public function getIterator(): Traversable
+    {
+        return new ArrayIterator($this->items);
+    }
+
+    public function jsonSerialize(): array
+    {
+        return json_decode(json_encode($this->items), true);
     }
 }
 
